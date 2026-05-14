@@ -109,29 +109,44 @@ Three orthogonal knobs on top of the minimal `Agent`:
 | `memory`             | `None`, `"page"`                                                                       | Whether the agent gets a long-term page store + a `memory` tool. Auto-on for `page_memory` and `team="fugue"`. |
 | `team`               | `None`, `"naive"`, `"swarm"`, `"fugue"`                                                | Single agent vs. three multi-agent topologies. |
 
-Local Qwen vLLM + Serper web search + rolling-summary compression. The
-rolling-summary strategy delegates compression to a separate (often cheaper
-/ smaller) LLM — any OpenAI-compatible endpoint works:
+DeepSeek for both the reasoning agent and the rolling-summary compressor,
+Serper for web search, and Jina Reader for fetching full pages. With
+`context_management="summary"`, whenever the running history exceeds
+`context_management_tokens`, the auxiliary LLM rewrites it into a compact
+summary tucked into the first user message:
 
 ```python
 from cabeza import Agent
 from cabeza.tools.search import SearchTool
+from cabeza.tools.visit import VisitTool
+
+deepseek_url = "https://api.deepseek.com/v1"
+deepseek_key = "sk-..."           # or set DEEPSEEK_API_KEY and drop the kwarg
 
 agent = Agent(
-    model="Qwen3-30B-A3B-Instruct-2507",
-    base_url="http://localhost:8001/v1",
-    api_key="EMPTY",
-    family="qwen",
-    tools=[SearchTool(api_key="serper-...")],
+    model="deepseek-v4-flash",
+    base_url=deepseek_url,
+    api_key=deepseek_key,
+    family="deepseek",
+    tools=[
+        SearchTool(api_key="serper-..."),        # or SearchTool() + $SERPER_API_KEY
+        VisitTool(                                # or VisitTool() + $JINA_API_KEY
+            jina_api_key="jina_...",
+            llm_api_key=deepseek_key,             # extractor LLM for visited pages
+            llm_base_url=deepseek_url,
+            llm_model="deepseek-v4-flash",
+        ),
+    ],
     context_management="summary",
     context_management_tokens=64_000,
     context_window_tokens=128_000,
-    # Compress with a small hosted model — pick whatever fits your budget:
-    summary_model="gpt-4o-mini",
-    summary_base_url="https://api.openai.com/v1",
-    summary_api_key="sk-...",
+    # Same DeepSeek endpoint reused as the rolling-summary compressor:
+    summary_model="deepseek-v4-flash",
+    summary_base_url=deepseek_url,
+    summary_api_key=deepseek_key,
     max_steps=20,
     timeout=120.0,
+    verbose=True,
 )
 print(agent.run("Which 2024 paper introduced …?"))
 ```
