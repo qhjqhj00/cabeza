@@ -50,8 +50,8 @@ print(agent.run(
 # Attention Is All You Need
 ```
 
-Drop `verbose=True` (the default) for a silent run; only tool-side prints
-remain. For richer instrumentation, register your own callbacks:
+`verbose` is off by default — drop it for a silent run (only tool-side
+prints remain). For richer instrumentation, register your own callbacks:
 
 ```python
 agent.on("after_llm",  lambda state, parsed: ...)
@@ -184,10 +184,10 @@ agent = Agent(
 ```
 
 **Full configuration reference**: every kwarg accepted by `Agent`, with
-defaults and notes, is documented inline in
-[`src/cabeza/agent.py`](src/cabeza/agent.py). The dataclasses
-`AgentConfig` / `MemoryConfig` / `TeamConfig` are the single source of truth
-for available knobs.
+defaults and notes, is documented inline in the `Agent.__init__` docstring at
+[`src/cabeza/agent.py`](src/cabeza/agent.py). The `MemoryConfig` and
+`TeamConfig` dataclasses in that same module cover the memory- and
+team-specific knobs.
 
 ---
 
@@ -342,7 +342,7 @@ cabeza/
   data/                        Bundled eval JSONLs (see Datasets)
   src/cabeza/
     __init__.py                Agent, Example, RunResult
-    agent.py                   Agent factory + AgentConfig / MemoryConfig / TeamConfig
+    agent.py                   Agent factory + MemoryConfig / TeamConfig
     base.py                    BaseAgent / NativeToolChatAgent / ContextManager / LLMConfig
     types.py                   Example, RunResult, Step, ToolCall
     _budget.py                 Token-budget helpers
@@ -367,15 +367,16 @@ cabeza/
 
 ## Tests
 
-Live test suites covering every public feature:
+Six suites covering every public feature — strategies (unit + live), tools +
+LLM smoke, team modes, the runner + CLI, and the eval scorer:
 
 ```bash
-python3 tests/run_all.py
+python3 tests/run_all.py            # all suites
+python3 tests/test_strategies_unit.py   # one suite (no network)
 ```
 
-Recent run: 35/35 probes pass in ~245 s. See
-[`tests/README.md`](tests/README.md) for per-suite details, what each probe
-asserts, and known flakiness around aggressive context-budget tests.
+See [`tests/README.md`](tests/README.md) for per-suite details, what each
+probe asserts, and known flakiness around aggressive context-budget tests.
 
 ---
 

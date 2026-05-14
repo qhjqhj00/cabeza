@@ -16,6 +16,7 @@ SUITES = [
     ("strategies_live", "test_strategies_live"),
     ("teams",           "test_teams"),
     ("runner",          "test_runner"),
+    ("eval",            "test_eval"),
 ]
 
 

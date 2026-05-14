@@ -1,6 +1,6 @@
 # cabeza tests
 
-Five suites cover the public surface area. All live tests read API keys from
+Six suites cover the public surface area. All live tests read API keys from
 `cabeza/.env` (`SERPER_API_KEY`, `JINA_API_KEY`, `DEEPSEEK_API_KEY`) and expect
 the local Qwen vLLM endpoint at `http://localhost:8001/v1` (override with
 `QWEN_BASE_URL` / `QWEN_MODEL`).
@@ -13,12 +13,13 @@ the local Qwen vLLM endpoint at `http://localhost:8001/v1` (override with
 | `test_live.py` | Per-piece smoke: local Qwen, Serper search, Serper scholar, raw Jina fetch, full VisitTool, DeepSeek adapter, Qwen+SearchTool round-trip. | yes |
 | `test_strategies_live.py` | End-to-end smoke for each of the 5 strategies, DeepSeek-driven agent + Serper, with a tiny soft budget so every strategy must fire. | yes |
 | `test_teams.py` | naive / swarm / fugue orchestrators end-to-end on DeepSeek. fugue additionally uses DeepSeek as the auxiliary summarizer model. | yes |
-| `test_runner.py` | JSONL + builtin + user-registered datasets, parallel + resumable `evaluate()`, plus the `cabeza` CLI (`list` / `run` / `eval`). | partial |
+| `test_runner.py` | JSONL + builtin + user-registered datasets, the `limit` knob, parallel + resumable `evaluate()`, plus the `cabeza` CLI (`list` / `run` / `eval`). | partial |
+| `test_eval.py` | LLM-as-a-judge accuracy scoring (`cabeza.eval.score` + the `cabeza score` CLI) against the bundled `bc` set. | yes |
 
 ## Running
 
 ```bash
-# Run every suite (~4 min on a warm cache):
+# Run every suite (~5 min on a warm cache):
 python3 tests/run_all.py
 
 # Run one suite:
@@ -27,6 +28,7 @@ python3 tests/test_strategies_live.py
 python3 tests/test_teams.py
 python3 tests/test_runner.py
 python3 tests/test_live.py
+python3 tests/test_eval.py
 
 # Run a subset of probes inside one suite:
 python3 tests/test_strategies_unit.py summary_fires page_memory_fires
