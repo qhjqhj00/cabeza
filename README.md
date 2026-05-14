@@ -36,13 +36,26 @@ agent = Agent(
     family="deepseek",                     # qwen / glm / kimi / deepseek / gpt / gpt_oss
     tools=[SearchTool(api_key="serper-...")],
     max_steps=8,
+    verbose=True,                          # stream step/tool/final to stdout
 )
 
 print(agent.run(
     "Which 2017 paper introduced the Transformer architecture? Use web "
     "search to confirm and reply with just the title."
 ))
-# → Attention Is All You Need
+# [cabeza] step 1 → search({'query': ['2017 paper Transformer architecture introduced']})
+# [Serper]  Searching: 2017 paper Transformer architecture introduced
+# [cabeza] step 1 ← search: A Google search for ... found 9 results …
+# [cabeza] step 2 ✓ final: "Attention Is All You Need"
+# Attention Is All You Need
+```
+
+Drop `verbose=True` (the default) for a silent run; only tool-side prints
+remain. For richer instrumentation, register your own callbacks:
+
+```python
+agent.on("after_llm",  lambda state, parsed: ...)
+agent.on("after_tool", lambda state, name, args, result: ...)
 ```
 
 Swap providers by changing `family` + `model` + `base_url` + `api_key` — the

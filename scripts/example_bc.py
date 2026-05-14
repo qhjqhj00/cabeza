@@ -74,6 +74,7 @@ agent = Agent(
     temperature=0.0,
     timeout=90.0,
     enable_thinking=False,
+    verbose=True,           # stream step/tool/final to stdout
 )
 
 

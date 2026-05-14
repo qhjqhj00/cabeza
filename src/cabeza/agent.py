@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from cabeza.base import BaseAgent, LLMConfig
 
@@ -191,6 +191,12 @@ class Agent:
 
     Swarm:
         ``team=None | "naive" | "swarm" | "fugue"`` plus ``team_config``.
+
+    Verbose:
+        ``verbose=True`` streams a step-by-step trace to stdout — every LLM
+        emission (tool call or final answer) and every tool result. Use
+        ``agent.on(event, fn)`` to register custom lifecycle hooks alongside
+        (or instead of) the built-in verbose printer.
     """
 
     def __init__(
@@ -232,6 +238,8 @@ class Agent:
         enable_thinking: bool = False,
         reasoning_effort: Optional[str] = None,
         extra_body: Optional[dict] = None,
+        # introspection
+        verbose: bool = False,
     ) -> None:
         self.family = _resolve_family(family)
         self.model = model
@@ -273,6 +281,58 @@ class Agent:
             reasoning_effort=reasoning_effort or None,
             extra_body=extra_body,
         )
+
+        # Lifecycle hooks — applied to the Gizmo agent inside build_single_agent.
+        # Each entry is (event_name, callback). Use ``agent.on(event, fn)`` to
+        # add more after construction.
+        self._hooks: list[tuple[str, Callable]] = []
+        self.verbose = bool(verbose)
+        if self.verbose:
+            self._install_verbose_hooks()
+
+    # ---- hooks ------------------------------------------------------------
+
+    def on(self, event: str, fn: Callable) -> "Agent":
+        """Register a lifecycle hook on every underlying Gizmo agent built by this factory.
+
+        Supported events:
+            ``before_llm(state, messages)``           — fired before every LLM call.
+            ``after_llm(state, parsed)``              — fired after every LLM call.
+            ``after_tool(state, name, args, result)`` — fired after each tool execution.
+            ``should_stop(state) -> Optional[str]``   — fired before every loop turn;
+                a non-empty return triggers a stop with that reason.
+
+        Returns ``self`` for chaining.
+        """
+        if event not in {"before_llm", "after_llm", "after_tool", "should_stop"}:
+            raise ValueError(f"Unknown hook event: {event!r}")
+        self._hooks.append((event, fn))
+        return self
+
+    def _install_verbose_hooks(self) -> None:
+        """Built-in step-by-step printer used when ``verbose=True``."""
+
+        def _short(s: Any, n: int = 160) -> str:
+            text = " ".join(str(s or "").split())
+            return text if len(text) <= n else text[: n - 1] + "…"
+
+        def on_after_llm(state, parsed):
+            tool_calls = parsed.get("tool_calls") or []
+            if tool_calls:
+                for tc in tool_calls:
+                    name = tc["function"]["name"]
+                    args = tc["function"].get("arguments", {})
+                    print(f"[cabeza] step {state.step} → {name}({_short(args, 200)})")
+                return
+            final = (parsed.get("final_content") or "").strip()
+            if final:
+                print(f"[cabeza] step {state.step} ✓ final: {_short(final, 220)}")
+
+        def on_after_tool(state, name, args, result):
+            print(f"[cabeza] step {state.step} ← {name}: {_short(result, 200)}")
+
+        self.on("after_llm", on_after_llm)
+        self.on("after_tool", on_after_tool)
 
     # ---- properties -------------------------------------------------------
 
@@ -406,6 +466,11 @@ class Agent:
             max_input_tokens=self.context_window_tokens,
             encoder=encoder,
         )
+
+        # Replay any lifecycle hooks (verbose printer + user callbacks) onto
+        # the freshly built Gizmo agent.
+        for event, fn in self._hooks:
+            agent.on(event, fn)
 
         return _AgentBundle(
             agent=agent,
