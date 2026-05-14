@@ -273,17 +273,33 @@ multiple `input_files=` to get a pass@k aggregate.
 
 ## CLI
 
-The `cabeza` console script bundles four subcommands:
+The `cabeza` console script bundles four subcommands.
+
+**Zero-config** — with provider + tool keys in the environment, `cabeza run`
+auto-detects everything. `--model` / `--base-url` / `--family` are inferred
+from `DEEPSEEK_API_KEY` → `OPENAI_API_KEY` → `QWEN_BASE_URL` (first match
+wins), and web tools turn on automatically when `SERPER_API_KEY` +
+`JINA_API_KEY` are both set:
+
+```bash
+# .env already has DEEPSEEK_API_KEY / SERPER_API_KEY / JINA_API_KEY exported:
+cabeza run "Which 2017 paper introduced the Transformer architecture?"
+# [cabeza] auto-config: DeepSeek / deepseek-v4-flash @ https://api.deepseek.com/v1 + web tools (Serper + Jina)
+# [cabeza] step 1 → search(...)
+# ...
+```
+
+**Explicit** — pass everything yourself when you don't want auto-detection:
 
 ```bash
 cabeza list                     # registered strategies / team modes / datasets
 
-cabeza run "your question" \    # one-off
+cabeza run "your question" \    # one-off  (streams step/tool/final by default)
     --model deepseek-v4-flash --base-url https://api.deepseek.com/v1 \
     --api-key $DEEPSEEK_API_KEY --family deepseek \
     --tools web --search-api-key $SERPER_API_KEY --jina-api-key $JINA_API_KEY
 
-cabeza eval \                   # full benchmark run, resumable
+cabeza eval \                   # full benchmark run, resumable (silent by default)
     --dataset bc --eval-num 100 \
     --out results/bc.jsonl --workers 4 \
     --model deepseek-v4-flash --base-url https://api.deepseek.com/v1 \
@@ -295,8 +311,9 @@ cabeza score \                  # judge accuracy on a prediction JSONL
     --judge_api_key $DEEPSEEK_API_KEY
 ```
 
-`cabeza run --help` and `cabeza eval --help` print the full flag tables (the
-same kwargs as `Agent(...)`, kebab-cased).
+`--verbose` / `--no-verbose` overrides the per-subcommand default (`run`
+streams, `eval` is silent). `cabeza run --help` / `cabeza eval --help` print
+the full flag tables (the same kwargs as `Agent(...)`, kebab-cased).
 
 ---
 

@@ -17,7 +17,7 @@ import os
 import sys
 from typing import Optional
 
-from cabeza.agent import Agent, MemoryConfig, TeamConfig
+from cabeza.agent import Agent, MemoryConfig, TeamConfig, _resolve_api_key
 from cabeza.context import list_strategies
 from cabeza.datasets import builtin_specs, load
 from cabeza.runner import evaluate
@@ -31,6 +31,86 @@ def _split_csv(value: Optional[str]) -> list[str]:
     if not value:
         return []
     return [v.strip() for v in str(value).split(",") if v.strip()]
+
+
+def _autodetect_provider() -> Optional[dict]:
+    """Infer model/base_url/family from whichever provider env vars are set.
+
+    Preference order: DeepSeek → OpenAI → local Qwen vLLM. Returns ``None``
+    when nothing is configured (the caller then requires explicit --model).
+    """
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return {
+            "family": "deepseek",
+            "model": os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+            "base_url": os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+            "label": "DeepSeek",
+        }
+    if os.environ.get("OPENAI_API_KEY"):
+        return {
+            "family": "gpt",
+            "model": os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+            "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+            "label": "OpenAI",
+        }
+    if os.environ.get("QWEN_BASE_URL"):
+        return {
+            "family": "qwen",
+            "model": os.environ.get("QWEN_MODEL", "Qwen3-30B-A3B-Instruct-2507"),
+            "base_url": os.environ["QWEN_BASE_URL"],
+            "label": "Qwen (local vLLM)",
+        }
+    return None
+
+
+def _autodetect_tool_preset() -> str:
+    """Pick a tool preset from env: 'web' when both Serper and Jina keys exist."""
+    if os.environ.get("SERPER_API_KEY") and os.environ.get("JINA_API_KEY"):
+        return "web"
+    return "none"
+
+
+def _resolve_provider_args(args: argparse.Namespace) -> None:
+    """Fill model/base_url/family from env when --model was not supplied.
+
+    Mutates ``args`` in place and prints a one-line summary of what was picked.
+    """
+    if args.model:
+        # Explicit --model: keep everything as given (family defaults to qwen
+        # via argparse if the user did not pass --family). Still resolve the
+        # key from env so tool wiring has a concrete value.
+        if not args.family:
+            args.family = "qwen"
+        args.api_key = _resolve_api_key(args.api_key, args.family)
+        return
+
+    auto = _autodetect_provider()
+    if auto is None:
+        raise SystemExit(
+            "No --model supplied and no provider env vars detected. Either pass "
+            "--model/--base-url/--family explicitly, or set one of "
+            "DEEPSEEK_API_KEY / OPENAI_API_KEY / QWEN_BASE_URL."
+        )
+    args.model = args.model or auto["model"]
+    args.base_url = args.base_url or auto["base_url"]
+    args.family = args.family or auto["family"]
+    # Resolve the key from the family env var now so downstream tool wiring
+    # (e.g. the visit-tool extractor LLM) has a concrete key to use.
+    args.api_key = _resolve_api_key(args.api_key, args.family)
+
+    # Auto-enable web tools when the user did not ask for a preset and the
+    # Serper + Jina keys are both present.
+    auto_tool_note = ""
+    if (args.tools or "none") == "none":
+        detected = _autodetect_tool_preset()
+        if detected != "none":
+            args.tools = detected
+            auto_tool_note = " + web tools (Serper + Jina)"
+
+    print(
+        f"[cabeza] auto-config: {auto['label']} / {args.model} "
+        f"@ {args.base_url}{auto_tool_note}"
+    )
 
 
 def _build_agent_from_args(args: argparse.Namespace) -> Agent:
@@ -139,17 +219,35 @@ def _build_agent_from_args(args: argparse.Namespace) -> Agent:
         stream=args.stream,
         enable_thinking=args.enable_thinking,
         reasoning_effort=args.reasoning_effort or None,
+        verbose=bool(getattr(args, "verbose", False)),
     )
 
 
 def _add_agent_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--model", required=True)
-    p.add_argument("--base-url", required=True)
-    p.add_argument("--api-key", default="EMPTY")
-    p.add_argument("--family", default="qwen", choices=["qwen", "glm", "kimi", "deepseek", "gpt", "gpt_oss", "gpt-oss"])
+    # model / base_url / family are optional: when omitted they are inferred
+    # from provider env vars (DEEPSEEK_API_KEY / OPENAI_API_KEY / QWEN_BASE_URL).
+    p.add_argument("--model", default="", help="LLM name. Omit to auto-detect from env.")
+    p.add_argument("--base-url", default="", help="OpenAI-compatible base URL. Omit to auto-detect.")
+    p.add_argument("--api-key", default=None, help="Provider key. Omit to read the family env var.")
+    p.add_argument(
+        "--family",
+        default="",
+        choices=["", "qwen", "glm", "kimi", "deepseek", "gpt", "gpt_oss", "gpt-oss"],
+        help="Agent family. Omit to auto-detect alongside --model.",
+    )
     p.add_argument("--system-prompt", default="")
     p.add_argument("--max-steps", type=int, default=200)
     p.add_argument("--max-time-seconds", type=float, default=None)
+
+    verbose_group = p.add_mutually_exclusive_group()
+    verbose_group.add_argument(
+        "--verbose", dest="verbose", action="store_true", default=None,
+        help="Stream step/tool/final to stdout (default on for `run`, off for `eval`).",
+    )
+    verbose_group.add_argument(
+        "--no-verbose", dest="verbose", action="store_false",
+        help="Silence the step-by-step trace.",
+    )
 
     p.add_argument(
         "--context-management",
@@ -218,6 +316,9 @@ def _add_agent_args(p: argparse.ArgumentParser) -> None:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    _resolve_provider_args(args)
+    if args.verbose is None:          # one-off command: stream by default
+        args.verbose = True
     agent = _build_agent_from_args(args)
     result = agent.run_verbose(args.question, owner="cli")
     print("===== prediction =====")
@@ -231,6 +332,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_eval(args: argparse.Namespace) -> int:
+    _resolve_provider_args(args)
+    if args.verbose is None:          # batch command: silent by default
+        args.verbose = False
     agent = _build_agent_from_args(args)
     limit = int(args.eval_num) if args.eval_num and int(args.eval_num) > 0 else None
     dataset = load(args.dataset, path=args.dataset_path or None, limit=limit)
