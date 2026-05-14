@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cabeza"
+version = "0.1.0"
+description = "A configurable inference harness for long-horizon agentic search."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.0",
+    "tiktoken",
+    "requests",
+    "numpy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+hf = ["datasets"]
+faiss = ["faiss-cpu", "datasets", "numpy"]
+all = ["datasets", "faiss-cpu", "numpy"]
+
+[project.scripts]
+cabeza = "cabeza.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cabeza*"]
