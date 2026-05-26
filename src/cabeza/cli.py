@@ -378,7 +378,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     run_parser.set_defaults(func=_cmd_run)
 
     eval_parser = sub.add_parser("eval", help="Run benchmark evaluation.")
-    eval_parser.add_argument("--dataset", required=True, help="Builtin dataset name (e.g. bc, bcp, ws, hle).")
+    eval_parser.add_argument("--dataset", required=True, help="Builtin dataset name (e.g. bc, bcp, ws, hle, dsqa, gisa).")
     eval_parser.add_argument("--dataset-path", default="", help="Override the dataset JSONL path.")
     eval_parser.add_argument(
         "--eval-num",
@@ -390,7 +390,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     eval_parser.add_argument("--log-dir", default="", help="Optional per-question log directory.")
     eval_parser.add_argument("--workers", type=int, default=4)
     eval_parser.add_argument("--no-resume", action="store_true")
-    eval_parser.add_argument("--answer-format", default="", choices=["", "browsecomp", "hle", "free"])
+    eval_parser.add_argument("--answer-format", default="", choices=["", "browsecomp", "hle", "gisa", "free"])
     _add_agent_args(eval_parser)
     eval_parser.set_defaults(func=_cmd_eval)
 
@@ -403,7 +403,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # the underlying evaluator already has a rich argparse surface.
     score_parser = sub.add_parser(
         "score",
-        help="Score a prediction JSONL via the LLM judge (bc/bc_zh/bcp/hle/ws).",
+        help="Score a prediction JSONL via the bundled evaluators (bc/bc_zh/bcp/hle/ws/dsqa/gisa).",
         add_help=False,
     )
     score_parser.set_defaults(func=_cmd_score)

@@ -4,6 +4,8 @@
 Dispatch:
 - ``bc`` / ``bc_zh`` / ``bcp`` / ``hle``  → :mod:`cabeza.eval._qa`
 - ``ws`` / ``widesearch`` / ``wide_search`` → :mod:`cabeza.eval._widesearch`
+- ``dsqa`` / ``deepsearchqa`` → :mod:`cabeza.eval._deepsearchqa`
+- ``gisa`` → :mod:`cabeza.eval._gisa`
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import sys
 from typing import Sequence
 
 WS_BENCHMARKS = {"ws", "widesearch", "wide_search"}
+DSQA_BENCHMARKS = {"dsqa", "deepsearchqa", "deepsearch_qa"}
+GISA_BENCHMARKS = {"gisa"}
 QA_BENCHMARKS = {
     "bc",
     "bc_zh",
@@ -27,7 +31,7 @@ QA_BENCHMARKS = {
     "browsecomp_plus",
     "hle",
 }
-ALL_BENCHMARKS = sorted(WS_BENCHMARKS | QA_BENCHMARKS)
+ALL_BENCHMARKS = sorted(WS_BENCHMARKS | DSQA_BENCHMARKS | GISA_BENCHMARKS | QA_BENCHMARKS)
 
 
 def extract_benchmark(argv: Sequence[str]) -> str | None:
@@ -58,16 +62,22 @@ def strip_benchmark_arg(argv: Sequence[str]) -> list[str]:
 def print_help() -> None:
     print(
         "Usage:\n"
-        "  cabeza score --benchmark {bc,bc_zh,bcp,hle,ws} [benchmark-specific args...]\n\n"
+        "  cabeza score --benchmark {bc,bc_zh,bcp,hle,ws,dsqa,gisa} "
+        "[benchmark-specific args...]\n\n"
         "Examples:\n"
         "  cabeza score --benchmark hle --input_file /path/to/run.jsonl "
         "--judge_model Qwen3-32B --judge_base_url http://localhost:8004/v1 --judge_api_key EMPTY\n"
         "  cabeza score --benchmark ws --input_file /path/to/run.jsonl "
         "--judge_model Qwen3-32B --judge_base_url http://localhost:8004/v1 --judge_api_key EMPTY\n\n"
+        "  cabeza score --benchmark dsqa --input_file /path/to/run.jsonl "
+        "--judge_model gemini-2.5-flash --judge_base_url https://... --judge_api_key ...\n"
+        "  cabeza score --benchmark gisa --input_file /path/to/run.jsonl\n\n"
         "Notes:\n"
         "  - QA benchmarks (`bc`, `bc_zh`, `bcp`, `hle`) are handled by `cabeza.eval._qa`.\n"
         "  - WideSearch (`ws`) is handled by `cabeza.eval._widesearch`.\n"
-        "  - Multiple `--input_file` are supported. QA computes pass@k; WideSearch computes best-of-k summary.\n"
+        "  - DeepSearchQA (`dsqa`) is handled by `cabeza.eval._deepsearchqa`.\n"
+        "  - GISA (`gisa`) is handled by `cabeza.eval._gisa`.\n"
+        "  - Multiple `--input_file` are supported for QA pass@k and WideSearch best-of-k.\n"
     )
 
 
@@ -97,6 +107,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         from cabeza.eval import _widesearch
 
         run_module(_widesearch.main, strip_benchmark_arg(argv))
+        return
+
+    if benchmark in DSQA_BENCHMARKS:
+        from cabeza.eval import _deepsearchqa
+
+        run_module(_deepsearchqa.main, strip_benchmark_arg(argv))
+        return
+
+    if benchmark in GISA_BENCHMARKS:
+        from cabeza.eval import _gisa
+
+        run_module(_gisa.main, strip_benchmark_arg(argv))
         return
 
     if benchmark in QA_BENCHMARKS:

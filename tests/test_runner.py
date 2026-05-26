@@ -55,15 +55,28 @@ def probe_jsonl_loader() -> tuple[bool, str]:
 
 
 def probe_builtin_registry() -> tuple[bool, str]:
-    from cabeza.datasets import builtin_specs
+    from cabeza.datasets import builtin_specs, load
     from cabeza.datasets.registry import get_spec
 
     specs = builtin_specs()
     names = {s.name for s in specs}
-    expected = {"bc", "bc_zh", "bcp", "ws", "hle"}
+    expected = {"bc", "bc_zh", "bcp", "ws", "hle", "dsqa", "gisa"}
     spec = get_spec("browsecomp")  # alias
-    ok = names == expected and spec.name == "bc"
-    return ok, f"names={sorted(names)} alias_resolved={spec.name}"
+    dsqa = get_spec("deepsearchqa")
+    gisa = get_spec("gisa")
+    gisa_ds = load("gisa", limit=1)
+    ok = (
+        names == expected
+        and spec.name == "bc"
+        and dsqa.name == "dsqa"
+        and gisa.name == "gisa"
+        and gisa.answer_format == "gisa"
+        and getattr(getattr(gisa_ds, "spec", None), "answer_format", None) == "gisa"
+    )
+    return ok, (
+        f"names={sorted(names)} alias_resolved={spec.name} "
+        f"dsqa={dsqa.name} gisa_format={gisa.answer_format}"
+    )
 
 
 def probe_limit_param() -> tuple[bool, str]:
@@ -82,6 +95,8 @@ def probe_limit_param() -> tuple[bool, str]:
     # ``load(..., limit=N)`` over a real built-in dataset:
     bc_full = load("bc")
     bc_three = load("bc", limit=3)
+    dsqa_two = load("dsqa", limit=2)
+    gisa_two = load("gisa", limit=2)
 
     ok = (
         len(full) == 20
@@ -90,10 +105,15 @@ def probe_limit_param() -> tuple[bool, str]:
         and [x["id"] for x in five] == ["0", "1", "2", "3", "4"]
         and len(bc_full) > 3
         and len(bc_three) == 3
+        and len(dsqa_two) == 2
+        and len(gisa_two) == 2
+        and "golden_answers" in dsqa_two[0]
+        and "golden_answers" in gisa_two[0]
     )
     return ok, (
         f"full={len(full)} five={len(five)} ids={[x['id'] for x in five]} "
-        f"bc_full={len(bc_full)} bc_three={len(bc_three)}"
+        f"bc_full={len(bc_full)} bc_three={len(bc_three)} "
+        f"dsqa_two={len(dsqa_two)} gisa_two={len(gisa_two)}"
     )
 
 

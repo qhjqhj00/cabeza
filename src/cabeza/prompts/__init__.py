@@ -28,11 +28,19 @@ Answer: {{your chosen answer}}
 Confidence: {{your confidence score between 0% and 100% for your answer}}"""
 
 
+GISA_TEMPLATE = """\
+{question}
+
+Return only the final answer in a TSV table wrapped in a ```tsv code block.
+Use tabs between columns. For item, set, and list answers, use a single-column
+TSV table. For table answers, include the requested column headers exactly."""
+
+
 def format_question(question: str, *, answer_format: Optional[str] = None) -> str:
     """Wrap a bare question in the requested answer-format template.
 
-    ``answer_format`` accepts ``"browsecomp"``, ``"hle"``, or ``None``/``"free"``
-    (returns the question unchanged).
+    ``answer_format`` accepts ``"browsecomp"``, ``"hle"``, ``"gisa"``, or
+    ``None``/``"free"`` (returns the question unchanged).
     """
     text = (question or "").strip()
     if not answer_format or answer_format == "free":
@@ -41,6 +49,8 @@ def format_question(question: str, *, answer_format: Optional[str] = None) -> st
         return BROWSECOMP_TEMPLATE.format(question=text)
     if answer_format == "hle":
         return HLE_TEMPLATE.format(question=text)
+    if answer_format == "gisa":
+        return GISA_TEMPLATE.format(question=text)
     raise ValueError(f"Unknown answer_format {answer_format!r}")
 
 

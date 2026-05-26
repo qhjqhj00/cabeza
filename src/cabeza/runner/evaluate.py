@@ -118,8 +118,8 @@ def evaluate(
         already present in the file.
     answer_format:
         Wraps the question with a benchmark answer-format template before
-        passing it to the agent. Accepts ``"browsecomp"``, ``"hle"``, ``"free"``,
-        or ``None`` (no wrapping). When ``None``, the function consults
+        passing it to the agent. Accepts ``"browsecomp"``, ``"hle"``,
+        ``"gisa"``, ``"free"``, or ``None`` (no wrapping). When ``None``, the function consults
         ``dataset.spec.answer_format`` if available.
     log_dir:
         Optional directory for per-example trajectory logs.

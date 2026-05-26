@@ -27,12 +27,14 @@ class JSONLDataset:
         *,
         name: Optional[str] = None,
         limit: Optional[int] = None,
+        spec: object | None = None,
     ) -> None:
         if not os.path.exists(path):
             raise FileNotFoundError(f"JSONL dataset not found: {path}")
         self.path = path
         self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.limit = int(limit) if limit and int(limit) > 0 else None
+        self.spec = spec
         self._items: list[Example] = list(self._load(path, limit=self.limit))
 
     @staticmethod

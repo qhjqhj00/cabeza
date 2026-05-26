@@ -203,6 +203,11 @@ data/
   ws/eval.jsonl       WideSearch                        (200 items)
   ws/gold/            WideSearch gold CSV tables        (200 files)
   hle/eval.jsonl      Humanity's Last Exam             (2158 items)
+  dsqa/eval.jsonl     DeepSearchQA                      (900 items)
+  dsqa/DSQA-full.csv  DeepSearchQA official metadata    (900 rows)
+  gisa/eval.jsonl     GISA                              (373 items)
+  gisa/encrypted_question.jsonl  GISA official metadata (373 rows)
+  gisa/answer/        GISA gold CSV answers             (373 files)
 ```
 
 ```python
@@ -210,6 +215,8 @@ from cabeza.datasets import load, JSONLDataset
 
 ds = load("bc")                              # all 1266 items
 ds = load("bc", limit=100)                   # first 100 only (--eval-num)
+ds = load("dsqa")                            # all 900 DeepSearchQA items
+ds = load("gisa")                            # all 373 GISA items
 ds = load("bc", path="/path/to/my.jsonl")    # use a different file
 ds = JSONLDataset("/path/to/eval.jsonl")     # anything JSONL-shaped
 
@@ -245,8 +252,8 @@ print(summary)   # {"completed": ..., "skipped": ..., "total": ..., ...}
 ## Scoring accuracy
 
 After a run produces `results.jsonl`, use cabeza's LLM-as-a-judge to compute
-accuracy. QA-style benchmarks (`bc` / `bc_zh` / `bcp` / `hle`) and WideSearch
-(`ws`) are both supported.
+accuracy. QA-style benchmarks (`bc` / `bc_zh` / `bcp` / `hle`), WideSearch
+(`ws`), DeepSearchQA (`dsqa`), and GISA (`gisa`) are supported.
 
 ```python
 from cabeza.eval import score
@@ -268,6 +275,28 @@ score(
 The summary JSON includes `accuracy`, `judged_predictions`,
 `available_predictions`, `total_questions`, calibration error, etc. Pass
 multiple `input_files=` to get a pass@k aggregate.
+
+DeepSearchQA uses its official LLM-as-a-judge prompt and reports the official
+fully-correct / fully-incorrect / correct-with-excessive plus precision,
+recall, and F1 metrics:
+
+```bash
+cabeza score \
+    --benchmark dsqa --input_file results/dsqa.jsonl \
+    --judge_model gemini-2.5-flash \
+    --judge_base_url https://your-openai-compatible-endpoint/v1 \
+    --judge_api_key $JUDGE_API_KEY
+```
+
+GISA uses the official deterministic TSV/CSV scorer and does not require a
+judge model. `load("gisa")` / `cabeza eval --dataset gisa` automatically wraps
+questions with the expected TSV output instruction.
+
+```bash
+cabeza score \
+    --benchmark gisa --input_file results/gisa.jsonl \
+    --summary_output results/gisa.summary.json
+```
 
 ---
 
@@ -305,10 +334,19 @@ cabeza eval \                   # full benchmark run, resumable (silent by defau
     --model deepseek-v4-flash --base-url https://api.deepseek.com/v1 \
     --api-key $DEEPSEEK_API_KEY --family deepseek
 
+cabeza eval \                   # GISA full set; prompts request TSV code blocks
+    --dataset gisa \
+    --out results/gisa.jsonl --workers 4 \
+    --model deepseek-v4-flash --base-url https://api.deepseek.com/v1 \
+    --api-key $DEEPSEEK_API_KEY --family deepseek
+
 cabeza score \                  # judge accuracy on a prediction JSONL
     --benchmark bc --input_file results/bc.jsonl \
     --judge_model deepseek-v4-flash --judge_base_url https://api.deepseek.com/v1 \
     --judge_api_key $DEEPSEEK_API_KEY
+
+cabeza score \                  # deterministic official GISA scoring
+    --benchmark gisa --input_file results/gisa.jsonl
 ```
 
 `--verbose` / `--no-verbose` overrides the per-subcommand default (`run`
@@ -357,7 +395,7 @@ cabeza/
     tools/                     BaseTool + search / visit / local_search / local_visit / scholar / python_exec + presets
     datasets/                  Dataset protocol + JSONL + HF + builtin registry
     runner/                    evaluate() — parallel, resumable, JSONL-streamed
-    eval/                      LLM-as-a-judge scorer (bc / bc_zh / bcp / hle / ws)
+    eval/                      Scorers (bc / bc_zh / bcp / hle / ws / dsqa / gisa)
     cli.py                     `cabeza` console entry
   scripts/example_bc.py        Runnable end-to-end example
   tests/                       5 test suites (see tests/README.md)

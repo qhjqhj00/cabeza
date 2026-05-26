@@ -1,7 +1,7 @@
 """Named dataset registry.
 
-Bundled SAM evaluation files (BrowseComp, BrowseCompZH, BrowseCompPlus,
-WideSearch, HLE) are registered by their canonical short names. Additional
+Bundled evaluation files (BrowseComp, BrowseCompZH, BrowseCompPlus,
+WideSearch, HLE, DeepSearchQA, GISA) are registered by their canonical short names. Additional
 datasets can be registered programmatically with ``register``.
 """
 
@@ -20,7 +20,7 @@ class DatasetSpec:
     name: str
     description: str
     default_path: str  # relative to the data root (or absolute)
-    answer_format: str = "free"  # "browsecomp" / "hle" / "free"
+    answer_format: str = "free"  # "browsecomp" / "hle" / "gisa" / "free"
     search_mode: str = "online"  # "online" / "corpus"
 
 
@@ -37,6 +37,10 @@ _DATASET_ALIASES = {
     "widesearch": "ws",
     "hle": "hle",
     "humanitys_last_exam": "hle",
+    "dsqa": "dsqa",
+    "deepsearchqa": "dsqa",
+    "deepsearch_qa": "dsqa",
+    "gisa": "gisa",
 }
 
 
@@ -74,6 +78,20 @@ _SPECS: dict[str, DatasetSpec] = {
         description="Humanity's Last Exam",
         default_path="hle/eval.jsonl",
         answer_format="hle",
+        search_mode="online",
+    ),
+    "dsqa": DatasetSpec(
+        name="dsqa",
+        description="DeepSearchQA",
+        default_path="dsqa/eval.jsonl",
+        answer_format="free",
+        search_mode="online",
+    ),
+    "gisa": DatasetSpec(
+        name="gisa",
+        description="GISA",
+        default_path="gisa/eval.jsonl",
+        answer_format="gisa",
         search_mode="online",
     ),
 }
@@ -159,4 +177,4 @@ def load(
         raise FileNotFoundError(
             f"No path supplied for dataset {name!r}; set CABEZA_DATA_ROOT or pass path=..."
         )
-    return JSONLDataset(resolved, name=spec.name, limit=limit)
+    return JSONLDataset(resolved, name=spec.name, limit=limit, spec=spec)

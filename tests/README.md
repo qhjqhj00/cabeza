@@ -14,7 +14,7 @@ the local Qwen vLLM endpoint at `http://localhost:8001/v1` (override with
 | `test_strategies_live.py` | End-to-end smoke for each of the 5 strategies, DeepSeek-driven agent + Serper, with a tiny soft budget so every strategy must fire. | yes |
 | `test_teams.py` | naive / swarm / fugue orchestrators end-to-end on DeepSeek. fugue additionally uses DeepSeek as the auxiliary summarizer model. | yes |
 | `test_runner.py` | JSONL + builtin + user-registered datasets, the `limit` knob, parallel + resumable `evaluate()`, plus the `cabeza` CLI (`list` / `run` / `eval`). | partial |
-| `test_eval.py` | LLM-as-a-judge accuracy scoring (`cabeza.eval.score` + the `cabeza score` CLI) against the bundled `bc` set. | yes |
+| `test_eval.py` | Accuracy scoring (`cabeza.eval.score` + the `cabeza score` CLI), including LLM-as-a-judge checks for `bc` and deterministic GISA scoring. | partial |
 
 ## Running
 

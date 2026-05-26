@@ -5,6 +5,8 @@ Probes:
                      bundled bc eval.jsonl; checks summary JSON has a
                      pass-rate field and at least one ``correct=yes`` row.
     cli_score      — same call via the ``cabeza score`` CLI subcommand.
+    gisa_perfect   — deterministic GISA scorer over predictions that point
+                     directly at the bundled gold CSV files.
 
 DeepSeek is used as the judge throughout.
 """
@@ -172,14 +174,60 @@ def probe_cli_score() -> tuple[bool, str]:
     )
 
 
+def probe_gisa_perfect() -> tuple[bool, str]:
+    from cabeza.eval import score
+
+    gisa_question_path = ROOT / "data" / "gisa" / "encrypted_question.jsonl"
+    answer_dir = ROOT / "data" / "gisa" / "answer"
+    with tempfile.TemporaryDirectory() as d:
+        dpath = Path(d)
+        pred_path = dpath / "gisa_preds.jsonl"
+        scored_out = dpath / "gisa_scored.jsonl"
+        summary_out = dpath / "gisa_summary.json"
+
+        rows: list[dict] = []
+        with gisa_question_path.open(encoding="utf-8-sig") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                obj = json.loads(line)
+                qid = str(obj["id"])
+                rows.append({"id": qid, "prediction": str(answer_dir / f"{qid}.csv")})
+        _write_predictions(pred_path, rows)
+
+        score(
+            benchmark="gisa",
+            input_files=[str(pred_path)],
+            extra_argv=[
+                "--scored_output", str(scored_out),
+                "--summary_output", str(summary_out),
+            ],
+        )
+        summary = json.loads(summary_out.read_text()) if summary_out.exists() else {}
+
+    ok = (
+        summary.get("total_questions") == 373
+        and summary.get("available_predictions") == 373
+        and float(summary.get("overall_global_em", 0.0)) == 1.0
+        and summary.get("table", {}).get("num_samples") == 253
+    )
+    return ok, (
+        f"total={summary.get('total_questions')} available={summary.get('available_predictions')} "
+        f"global_em={summary.get('overall_global_em')} table={summary.get('table', {}).get('num_samples')}"
+    )
+
+
 PROBES = {
     "bc_two_items": probe_bc_two_items,
     "cli_score": probe_cli_score,
+    "gisa_perfect": probe_gisa_perfect,
 }
 
 
 def main(argv: list[str]) -> int:
-    if not DEEPSEEK_KEY:
+    selected = argv or list(PROBES)
+    needs_judge = {"bc_two_items", "cli_score"}
+    if not DEEPSEEK_KEY and any(name in needs_judge for name in selected):
         print("[!] DEEPSEEK_API_KEY required.")
         return 2
     return run_probes(PROBES, argv)
